@@ -1,0 +1,530 @@
+---
+/**
+ * CurrencyConverter.astro
+ * Real-time currency converter for Argentina
+ * Shows Dólar Oficial vs Dólar Blue rates
+ */
+---
+
+<div class="currency-converter" id="currency-converter">
+  <div class="converter-header">
+    <h3>💱 Conversor de Moneda Argentina</h3>
+    <span class="last-updated" id="last-updated">Actualizando...</span>
+  </div>
+  
+  <div class="converter-body">
+    <!-- Input Amount -->
+    <div class="input-group">
+      <label for="currency-amount">Monto</label>
+      <div class="input-wrapper">
+        <input 
+          type="number" 
+          id="currency-amount" 
+          class="currency-input" 
+          value="100"
+          min="0"
+          step="10"
+          placeholder="100"
+        />
+        <select id="currency-from" class="currency-select">
+          <option value="USD">USD 🇺🇸</option>
+          <option value="EUR">EUR 🇪🇺</option>
+          <option value="ARS">ARS 🇦🇷</option>
+        </select>
+      </div>
+    </div>
+    
+    <!-- Conversion Results -->
+    <div class="conversion-results">
+      <!-- Dólar Oficial Card -->
+      <div class="rate-card oficial">
+        <div class="rate-header">
+          <span class="rate-label">💼 Dólar Oficial</span>
+          <span class="rate-badge oficial-badge">Banco</span>
+        </div>
+        <div class="rate-value" id="oficial-result">
+          <span class="amount">$0</span>
+          <span class="currency">ARS</span>
+        </div>
+        <div class="rate-detail">
+          Cotización: <span id="oficial-rate">-</span>
+        </div>
+      </div>
+      
+      <!-- Dólar Blue Card -->
+      <div class="rate-card blue">
+        <div class="rate-header">
+          <span class="rate-label">💸 Dólar Blue</span>
+          <span class="rate-badge blue-badge">Mejor</span>
+        </div>
+        <div class="rate-value" id="blue-result">
+          <span class="amount">$0</span>
+          <span class="currency">ARS</span>
+        </div>
+        <div class="rate-detail">
+          Cotización: <span id="blue-rate">-</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Difference Info -->
+    <div class="difference-info" id="difference-info">
+      <i class="fas fa-info-circle"></i>
+      <span>Con dólar blue obtienes <strong id="difference-amount">-</strong> más (diferencia: <strong id="difference-percent">-</strong>)</span>
+    </div>
+    
+    <!-- Quick Tips -->
+    <div class="converter-tips">
+      <details>
+        <summary>💡 Tips para cambiar dinero en Argentina</summary>
+        <ul>
+          <li><strong>Dólar Blue:</strong> Se consigue en casas de cambio (cuevas) o Western Union</li>
+          <li><strong>Dólar Oficial:</strong> En bancos y cajeros automáticos</li>
+          <li><strong>Recomendado:</strong> Traer USD en efectivo y cambiar en Western Union</li>
+          <li><strong>Evitar:</strong> Cambiar en el aeropuerto (peor tasa)</li>
+        </ul>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script is:inline>
+  async function initCurrencyConverter() {
+    const amountInput = document.getElementById('currency-amount');
+    const currencyFrom = document.getElementById('currency-from');
+    const oficialResult = document.getElementById('oficial-result');
+    const blueResult = document.getElementById('blue-result');
+    const oficialRate = document.getElementById('oficial-rate');
+    const blueRate = document.getElementById('blue-rate');
+    const lastUpdated = document.getElementById('last-updated');
+    const differenceAmount = document.getElementById('difference-amount');
+    const differencePercent = document.getElementById('difference-percent');
+    
+    let rates = {
+      oficial: { buy: 0, sell: 0 },
+      blue: { buy: 0, sell: 0 },
+      euro: { buy: 0, sell: 0 }
+    };
+    
+    // Fetch rates from API
+    async function fetchRates() {
+      try {
+        // Using dolarapi.com - free Argentina currency API
+        const response = await fetch('https://dolarapi.com/v1/dolares');
+        const data = await response.json();
+        
+        // Find oficial and blue rates
+        const oficialData = data.find(d => d.nombre === 'Oficial');
+        const blueData = data.find(d => d.nombre === 'Blue');
+        
+        if (oficialData && blueData) {
+          rates.oficial = {
+            buy: oficialData.compra,
+            sell: oficialData.venta
+          };
+          rates.blue = {
+            buy: blueData.compra,
+            sell: blueData.venta
+          };
+          
+          // Update last updated time
+          const now = new Date();
+          lastUpdated.textContent = `Actualizado: ${now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+          
+          // Calculate conversions
+          updateConversion();
+        }
+      } catch (error) {
+        console.error('Error fetching rates:', error);
+        // Fallback to hardcoded rates if API fails
+        rates.oficial = { buy: 1050, sell: 1070 };
+        rates.blue = { buy: 1380, sell: 1400 };
+        lastUpdated.textContent = 'Usando tasas aproximadas';
+        updateConversion();
+      }
+    }
+    
+    function updateConversion() {
+      const amount = parseFloat(amountInput.value) || 0;
+      const fromCurrency = currencyFrom.value;
+      
+      let baseAmount = amount;
+      
+      // If EUR, convert to USD first (approximation)
+      if (fromCurrency === 'EUR') {
+        baseAmount = amount * 1.08; // EUR to USD approximation
+      } else if (fromCurrency === 'ARS') {
+        // Converting from ARS to USD
+        const oficialResultUSD = amount / rates.oficial.sell;
+        const blueResultUSD = amount / rates.blue.sell;
+        
+        oficialResult.querySelector('.amount').textContent = `$${oficialResultUSD.toFixed(2)}`;
+        blueResult.querySelector('.amount').textContent = `$${blueResultUSD.toFixed(2)}`;
+        oficialResult.querySelector('.currency').textContent = 'USD';
+        blueResult.querySelector('.currency').textContent = 'USD';
+        
+        oficialRate.textContent = `1 USD = ${rates.oficial.sell.toFixed(2)} ARS`;
+        blueRate.textContent = `1 USD = ${rates.blue.sell.toFixed(2)} ARS`;
+        
+        const diff = blueResultUSD - oficialResultUSD;
+        const diffPercent = ((blueResultUSD / oficialResultUSD - 1) * 100).toFixed(1);
+        differenceAmount.textContent = `$${Math.abs(diff).toFixed(2)} USD`;
+        differencePercent.textContent = `${Math.abs(diffPercent)}%`;
+        
+        return;
+      }
+      
+      // Convert to ARS (selling, what you get)
+      const oficialARS = baseAmount * rates.oficial.sell;
+      const blueARS = baseAmount * rates.blue.sell;
+      
+      // Update UI
+      oficialResult.querySelector('.amount').textContent = `$${oficialARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+      blueResult.querySelector('.amount').textContent = `$${blueARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+      
+      oficialRate.textContent = `1 USD = ${rates.oficial.sell.toFixed(2)} ARS`;
+      blueRate.textContent = `1 USD = ${rates.blue.sell.toFixed(2)} ARS`;
+      
+      // Calculate difference
+      const diff = blueARS - oficialARS;
+      const diffPercent = ((blueARS / oficialARS - 1) * 100).toFixed(1);
+      
+      differenceAmount.textContent = `$${diff.toLocaleString('es-AR', { maximumFractionDigits: 0 })} ARS`;
+      differencePercent.textContent = `${diffPercent}%`;
+    }
+    
+    // Event listeners
+    amountInput.addEventListener('input', updateConversion);
+    currencyFrom.addEventListener('change', updateConversion);
+    
+    // Initial fetch
+    await fetchRates();
+    
+    // Refresh every 5 minutes
+    setInterval(fetchRates, 5 * 60 * 1000);
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCurrencyConverter);
+  } else {
+    initCurrencyConverter();
+  }
+  
+  document.addEventListener('astro:page-load', initCurrencyConverter);
+</script>
+
+<style>
+  .currency-converter {
+    background: white;
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+    border: 1px solid #E2E8F0;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .currency-converter {
+      background: #1e293b;
+      border-color: #334155;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+  }
+  
+  .converter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #E2E8F0;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .converter-header {
+      border-bottom-color: #334155;
+    }
+  }
+  
+  .converter-header h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--title, #2D3748);
+    margin: 0;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .converter-header h3 {
+      color: #f1f5f9;
+    }
+  }
+  
+  .last-updated {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #718096);
+    font-weight: 500;
+  }
+  
+  /* Input Group */
+  .input-group {
+    margin-bottom: 20px;
+  }
+  
+  .input-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary, #718096);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .input-wrapper {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+  }
+  
+  .currency-input {
+    padding: 12px 16px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border: 2px solid #E2E8F0;
+    border-radius: 12px;
+    background: #F8F9FA;
+    color: var(--title, #2D3748);
+    transition: all 0.3s ease;
+  }
+  
+  .currency-input:focus {
+    outline: none;
+    border-color: #F4B942;
+    background: white;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .currency-input {
+      background: #0f172a;
+      border-color: #334155;
+      color: #f1f5f9;
+    }
+    
+    .currency-input:focus {
+      background: #1e293b;
+    }
+  }
+  
+  .currency-select {
+    padding: 12px 16px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: 2px solid #E2E8F0;
+    border-radius: 12px;
+    background: #F8F9FA;
+    color: var(--title, #2D3748);
+    cursor: pointer;
+    min-width: 110px;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .currency-select {
+      background: #0f172a;
+      border-color: #334155;
+      color: #f1f5f9;
+    }
+  }
+  
+  /* Conversion Results */
+  .conversion-results {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .rate-card {
+    padding: 20px;
+    border-radius: 16px;
+    border: 2px solid;
+    transition: all 0.3s ease;
+  }
+  
+  .rate-card.oficial {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(59, 130, 246, 0.1));
+    border-color: #3B82F6;
+  }
+  
+  .rate-card.blue {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(16, 185, 129, 0.1));
+    border-color: #10B981;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .rate-card.oficial {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.15));
+    }
+    
+    .rate-card.blue {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.15));
+    }
+  }
+  
+  .rate-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  
+  .rate-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary, #718096);
+  }
+  
+  .rate-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 8px;
+  }
+  
+  .oficial-badge {
+    background: #3B82F6;
+    color: white;
+  }
+  
+  .blue-badge {
+    background: #10B981;
+    color: white;
+  }
+  
+  .rate-value {
+    margin-bottom: 8px;
+  }
+  
+  .rate-value .amount {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--title, #2D3748);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .rate-value .amount {
+      color: #f1f5f9;
+    }
+  }
+  
+  .rate-value .currency {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary, #718096);
+    margin-left: 4px;
+  }
+  
+  .rate-detail {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #718096);
+  }
+  
+  .rate-detail span {
+    font-weight: 600;
+  }
+  
+  /* Difference Info */
+  .difference-info {
+    background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    color: #92400E;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .difference-info {
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.3));
+      color: #FDE68A;
+    }
+  }
+  
+  .difference-info i {
+    font-size: 1.2rem;
+  }
+  
+  .difference-info strong {
+    font-weight: 700;
+  }
+  
+  /* Converter Tips */
+  .converter-tips {
+    margin-top: 15px;
+  }
+  
+  .converter-tips details {
+    background: #F8F9FA;
+    border-radius: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .converter-tips details {
+      background: #0f172a;
+    }
+  }
+  
+  .converter-tips summary {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--title, #2D3748);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .converter-tips summary {
+      color: #f1f5f9;
+    }
+  }
+  
+  .converter-tips summary::-webkit-details-marker {
+    display: none;
+  }
+  
+  .converter-tips ul {
+    margin: 12px 0 0 0;
+    padding-left: 20px;
+  }
+  
+  .converter-tips li {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #718096);
+    margin: 8px 0;
+    line-height: 1.5;
+  }
+  
+  .converter-tips strong {
+    color: var(--title, #2D3748);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .converter-tips strong {
+      color: #f1f5f9;
+    }
+  }
+  
+  /* Responsive */
+  @media (max-width: 600px) {
+    .conversion-results {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -1,0 +1,360 @@
+---
+/**
+ * FilterBar.astro
+ * Interactive filter bar for experiences/activities
+ */
+
+interface Props {
+  categories?: string[];
+  priceRange?: boolean;
+  showCounter?: boolean;
+}
+
+const { 
+  categories = ['Todas', 'Gratuita', 'Aventura', 'Cultural', 'Gastronómica', 'Naturaleza'],
+  priceRange = true,
+  showCounter = true
+} = Astro.props;
+---
+
+<div class="filter-bar" id="filter-bar">
+  <div class="filter-section">
+    <label class="filter-label">Categoría:</label>
+    <div class="filter-buttons category-filters">
+      {categories.map((cat, index) => (
+        <button 
+          class={`filter-btn ${index === 0 ? 'active' : ''}`}
+          data-filter-category={cat.toLowerCase()}
+          data-filter-type="category"
+        >
+          {cat}
+        </button>
+      ))}
+    </div>
+  </div>
+  
+  {priceRange && (
+    <div class="filter-section">
+      <label class="filter-label">Precio:</label>
+      <div class="filter-buttons price-filters">
+        <button class="filter-btn active" data-filter-price="all" data-filter-type="price">
+          Todos
+        </button>
+        <button class="filter-btn" data-filter-price="free" data-filter-type="price">
+          💚 Gratis
+        </button>
+        <button class="filter-btn" data-filter-price="low" data-filter-type="price">
+          $ Económico
+        </button>
+        <button class="filter-btn" data-filter-price="mid" data-filter-type="price">
+          $$ Moderado
+        </button>
+        <button class="filter-btn" data-filter-price="high" data-filter-type="price">
+          $$$ Premium
+        </button>
+      </div>
+    </div>
+  )}
+  
+  {showCounter && (
+    <div class="filter-counter" id="filter-counter">
+      Mostrando <strong id="items-shown">0</strong> de <strong id="items-total">0</strong>
+    </div>
+  )}
+  
+  <button class="filter-clear" id="clear-filters" style="display: none;">
+    <i class="fas fa-times-circle"></i> Limpiar filtros
+  </button>
+</div>
+
+<script>
+  function initFilters() {
+    const filterBar = document.getElementById('filter-bar');
+    if (!filterBar) return;
+    
+    const filterButtons = filterBar.querySelectorAll('.filter-btn');
+    const clearButton = document.getElementById('clear-filters');
+    const itemsShown = document.getElementById('items-shown');
+    const itemsTotal = document.getElementById('items-total');
+    
+    let activeFilters = {
+      category: 'todas',
+      price: 'all'
+    };
+    
+    // Get all filterable items (assuming they have data attributes)
+    function getFilterableItems() {
+      return document.querySelectorAll('[data-filter-item]');
+    }
+    
+    function updateCounter() {
+      const items = getFilterableItems();
+      const visibleItems = Array.from(items).filter(item => 
+        item.style.display !== 'none'
+      );
+      
+      if (itemsShown && itemsTotal) {
+        itemsShown.textContent = visibleItems.length;
+        itemsTotal.textContent = items.length;
+      }
+    }
+    
+    function applyFilters() {
+      const items = getFilterableItems();
+      let hasActiveFilters = activeFilters.category !== 'todas' || activeFilters.price !== 'all';
+      
+      items.forEach(item => {
+        const itemCategory = (item.getAttribute('data-category') || '').toLowerCase();
+        const itemPrice = (item.getAttribute('data-price') || '').toLowerCase();
+        
+        let showItem = true;
+        
+        // Apply category filter
+        if (activeFilters.category !== 'todas') {
+          showItem = showItem && itemCategory === activeFilters.category;
+        }
+        
+        // Apply price filter
+        if (activeFilters.price !== 'all') {
+          if (activeFilters.price === 'free') {
+            showItem = showItem && (itemPrice === 'gratis' || itemPrice === 'free');
+          } else {
+            showItem = showItem && itemPrice === activeFilters.price;
+          }
+        }
+        
+        // Animate filter
+        if (showItem) {
+          item.style.display = '';
+          requestAnimationFrame(() => {
+            item.classList.add('filter-fade-in');
+          });
+        } else {
+          item.classList.remove('filter-fade-in');
+          item.style.display = 'none';
+        }
+      });
+      
+      updateCounter();
+      
+      // Show/hide clear button
+      if (clearButton) {
+        clearButton.style.display = hasActiveFilters ? 'flex' : 'none';
+      }
+      
+      // Show toast if using global toast
+      if (hasActiveFilters && window.showToast) {
+        const visibleCount = Array.from(items).filter(i => i.style.display !== 'none').length;
+        window.showToast(`${visibleCount} resultados encontrados`, 'info', 2000);
+      }
+    }
+    
+    // Filter button click handlers
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const filterType = this.getAttribute('data-filter-type');
+        
+        // Remove active from siblings
+        const siblings = this.parentElement.querySelectorAll('.filter-btn');
+        siblings.forEach(s => s.classList.remove('active'));
+        
+        // Add active to this button
+        this.classList.add('active');
+        
+        // Update active filters
+        if (filterType === 'category') {
+          activeFilters.category = this.getAttribute('data-filter-category');
+        } else if (filterType === 'price') {
+          activeFilters.price = this.getAttribute('data-filter-price');
+        }
+        
+        applyFilters();
+      });
+    });
+    
+    // Clear filters
+    if (clearButton) {
+      clearButton.addEventListener('click', () => {
+        activeFilters = { category: 'todas', price: 'all' };
+        
+        filterButtons.forEach(btn => {
+          btn.classList.remove('active');
+          if (btn.getAttribute('data-filter-category') === 'todas' || 
+              btn.getAttribute('data-filter-price') === 'all') {
+            btn.classList.add('active');
+          }
+        });
+        
+        applyFilters();
+        
+        if (window.showToast) {
+          window.showToast('Filtros limpiados', 'info', 2000);
+        }
+      });
+    }
+    
+    // Initial count
+    updateCounter();
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFilters);
+  } else {
+    initFilters();
+  }
+  
+  document.addEventListener('astro:page-load', initFilters);
+</script>
+
+<style>
+  .filter-bar {
+    background: var(--card-bg, white);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 1px solid var(--border, #E2E8F0);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 80px;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.95);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .filter-bar {
+      background: rgba(30, 41, 59, 0.95);
+      border-color: #334155;
+    }
+  }
+  
+  .filter-section {
+    margin-bottom: 15px;
+  }
+  
+  .filter-section:last-of-type {
+    margin-bottom: 0;
+  }
+  
+  .filter-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary, #718096);
+    margin-bottom: 10px;
+  }
+  
+  .filter-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .filter-btn {
+    padding: 8px 16px;
+    border: 2px solid var(--border, #E2E8F0);
+    background: var(--bg, white);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text, #2D3748);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .filter-btn {
+      background: #0f172a;
+      border-color: #334155;
+      color: #f1f5f9;
+    }
+  }
+  
+  .filter-btn:hover {
+    border-color: var(--gold, #F4B942);
+    transform: translateY(-1px);
+  }
+  
+  .filter-btn.active {
+    background: linear-gradient(135deg, #F4B942, #d97706);
+    border-color: #F4B942;
+    color: white;
+    box-shadow: 0 4px 12px rgba(244, 185, 66, 0.3);
+  }
+  
+  .filter-counter {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border, #E2E8F0);
+    font-size: 0.9rem;
+    color: var(--text-secondary, #718096);
+    text-align: center;
+  }
+  
+  .filter-counter strong {
+    color: var(--gold, #F4B942);
+    font-weight: 700;
+  }
+  
+  .filter-clear {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 15px auto 0;
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--border, #E2E8F0);
+    border-radius: 12px;
+    color: var(--text-secondary, #718096);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .filter-clear:hover {
+    background: #FEE2E2;
+    border-color: #EF4444;
+    color: #EF4444;
+  }
+  
+  /* Filter animation */
+  :global([data-filter-item]) {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  
+  :global(.filter-fade-in) {
+    animation: fadeInUp 0.4s ease;
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Mobile */
+  @media (max-width: 768px) {
+    .filter-bar {
+      padding: 15px;
+      top: 60px;
+    }
+    
+    .filter-buttons {
+      gap: 6px;
+    }
+    
+    .filter-btn {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+  }
+</style>

@@ -1,0 +1,758 @@
+---
+/**
+ * BudgetCalculator.astro
+ * Interactive budget calculator for trip planning
+ */
+
+interface Props {
+  destinationName?: string;
+}
+
+const { destinationName = 'Argentina' } = Astro.props;
+---
+
+<div class="budget-calculator" id="budget-calculator">
+  <div class="calculator-header">
+    <h3>💰 Calculá tu Presupuesto para {destinationName}</h3>
+    <p class="calculator-subtitle">Estimá cuánto necesitas para tu viaje</p>
+  </div>
+  
+  <div class="calculator-body">
+    <!-- Inputs -->
+    <div class="calculator-inputs">
+      <div class="input-group">
+        <label for="days-slider">
+          <i class="fas fa-calendar-alt"></i>
+          ¿Cuántos días?
+          <span class="input-value" id="days-value">5</span>
+        </label>
+        <input 
+          type="range" 
+          id="days-slider" 
+          class="slider"
+          min="1" 
+          max="30" 
+          value="5"
+          step="1"
+        />
+        <div class="slider-marks">
+          <span>1</span>
+          <span>15</span>
+          <span>30</span>
+        </div>
+      </div>
+      
+      <div class="input-group">
+        <label>
+          <i class="fas fa-hotel"></i>
+          Tipo de alojamiento
+        </label>
+        <div class="option-buttons" id="accommodation-options">
+          <button class="option-btn" data-value="20" data-type="accommodation">
+            Hostel
+          </button>
+          <button class="option-btn active" data-value="50" data-type="accommodation">
+            Hotel Mid
+          </button>
+          <button class="option-btn" data-value="100" data-type="accommodation">
+            Hotel Lujo
+          </button>
+        </div>
+      </div>
+      
+      <div class="input-group">
+        <label>
+          <i class="fas fa-utensils"></i>
+          Comidas por día
+        </label>
+        <div class="option-buttons" id="meals-options">
+          <button class="option-btn" data-value="15" data-type="meals">
+            Económico
+          </button>
+          <button class="option-btn active" data-value="30" data-type="meals">
+            Promedio
+          </button>
+          <button class="option-btn" data-value="60" data-type="meals">
+            Restaurantes
+          </button>
+        </div>
+      </div>
+      
+      <div class="input-group">
+        <label for="activities-slider">
+          <i class="fas fa-ticket-alt"></i>
+          Actividades/Tours
+          <span class="input-value" id="activities-value">2-3 por día</span>
+        </label>
+        <input 
+          type="range" 
+          id="activities-slider" 
+          class="slider"
+          min="0" 
+          max="5" 
+          value="2"
+          step="1"
+        />
+        <div class="slider-marks">
+          <span>0</span>
+          <span>3</span>
+          <span>5+</span>
+        </div>
+      </div>
+      
+      <div class="input-group">
+        <label>
+          <i class="fas fa-bus"></i>
+          Transporte
+        </label>
+        <div class="option-buttons" id="transport-options">
+          <button class="option-btn" data-value="5" data-type="transport">
+            Público
+          </button>
+          <button class="option-btn active" data-value="15" data-type="transport">
+            Mix
+          </button>
+          <button class="option-btn" data-value="40" data-type="transport">
+            Uber/Taxi
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Results -->
+    <div class="calculator-results">
+      <div class="result-card total-card">
+        <div class="result-header">
+          <span class="result-label">Presupuesto Total</span>
+          <span class="result-range">Min - Max</span>
+        </div>
+        <div class="result-amount" id="total-amount">
+          <span class="amount-min">$0</span>
+          <span class="amount-separator">-</span>
+          <span class="amount-max">$0</span>
+        </div>
+        <div class="result-currency">USD</div>
+        <div class="result-perday" id="perday-amount">$0/día</div>
+      </div>
+      
+      <!-- Breakdown Chart -->
+      <div class="breakdown-section">
+        <h4>Desglose del presupuesto</h4>
+        <div class="breakdown-chart" id="breakdown-chart"></div>
+        <div class="breakdown-list" id="breakdown-list"></div>
+      </div>
+      
+      <!-- CTA -->
+      <div class="calculator-cta">
+        <button class="download-btn" id="download-budget">
+          <i class="fas fa-download"></i>
+          Descargar Presupuesto Detallado
+        </button>
+        <p class="cta-note">Recibe un PDF personalizado con tu plan de gastos</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function initBudgetCalculator() {
+    const daysSlider = document.getElementById('days-slider');
+    const daysValue = document.getElementById('days-value');
+    const activitiesSlider = document.getElementById('activities-slider');
+    const activitiesValue = document.getElementById('activities-value');
+    const optionButtons = document.querySelectorAll('.option-btn');
+    const totalAmountEl = document.getElementById('total-amount');
+    const perdayAmountEl = document.getElementById('perday-amount');
+    const breakdownChart = document.getElementById('breakdown-chart');
+    const breakdownList = document.getElementById('breakdown-list');
+    const downloadBtn = document.getElementById('download-budget');
+    
+    let budget = {
+      days: 5,
+      accommodation: 50,
+      meals: 30,
+      activities: 2,
+      transport: 15
+    };
+    
+    const activityCosts = {
+      0: 0,
+      1: 20,
+      2: 40,
+      3: 60,
+      4: 80,
+      5: 100
+    };
+    
+    const activityLabels = {
+      0: 'Ninguna',
+      1: '1 por día',
+      2: '2-3 por día',
+      3: '3-4 por día',
+      4: '4-5 por día',
+      5: '5+ por día'
+    };
+    
+    // Update days
+    daysSlider?.addEventListener('input', function() {
+      budget.days = parseInt(this.value);
+      daysValue.textContent = budget.days;
+      calculate();
+    });
+    
+    // Update activities
+    activitiesSlider?.addEventListener('input', function() {
+      budget.activities = parseInt(this.value);
+      activitiesValue.textContent = activityLabels[budget.activities];
+      calculate();
+    });
+    
+    // Option buttons
+    optionButtons.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const type = this.getAttribute('data-type');
+        const value = parseInt(this.getAttribute('data-value'));
+        
+        // Remove active from siblings
+        const siblings = this.parentElement.querySelectorAll('.option-btn');
+        siblings.forEach(s => s.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Update budget
+        budget[type] = value;
+        calculate();
+      });
+    });
+    
+    // Calculate budget
+    function calculate() {
+      const dailyAccommodation = budget.accommodation;
+      const dailyMeals = budget.meals;
+      const dailyActivities = activityCosts[budget.activities];
+      const dailyTransport = budget.transport;
+      
+      const dailyTotal = dailyAccommodation + dailyMeals + dailyActivities + dailyTransport;
+      
+      // Add 10% variance for min-max
+      const totalMin = Math.round(dailyTotal * budget.days * 0.9);
+      const totalMax = Math.round(dailyTotal * budget.days * 1.1);
+      const avgPerDay = Math.round((totalMin + totalMax) / 2 / budget.days);
+      
+      // Update UI
+      totalAmountEl.querySelector('.amount-min').textContent = `$${totalMin.toLocaleString()}`;
+      totalAmountEl.querySelector('.amount-max').textContent = `$${totalMax.toLocaleString()}`;
+      perdayAmountEl.textContent = `$${avgPerDay}/día`;
+      
+      // Calculate percentages
+      const breakdown = [
+        { label: 'Alojamiento', icon: '🏨', amount: dailyAccommodation * budget.days, color: '#3B82F6' },
+        { label: 'Comida', icon: '🍽️', amount: dailyMeals * budget.days, color: '#10B981' },
+        { label: 'Actividades', icon: '🎯', amount: dailyActivities * budget.days, color: '#F59E0B' },
+        { label: 'Transporte', icon: '🚕', amount: dailyTransport * budget.days, color: '#8B5CF6' }
+      ];
+      
+      const totalAmount = breakdown.reduce((sum, item) => sum + item.amount, 0);
+      
+      breakdown.forEach(item => {
+        item.percentage = ((item.amount / totalAmount) * 100).toFixed(0);
+      });
+      
+      // Render chart
+      renderChart(breakdown);
+      renderList(breakdown);
+    }
+    
+    function renderChart(breakdown) {
+      const chartHTML = breakdown.map(item => `
+        <div class="chart-bar" style="flex: ${item.percentage};">
+          <div class="bar-fill" style="background: ${item.color};" title="${item.label}: ${item.percentage}%"></div>
+        </div>
+      `).join('');
+      
+      breakdownChart.innerHTML = `<div class="chart-bars">${chartHTML}</div>`;
+    }
+    
+    function renderList(breakdown) {
+      const listHTML = breakdown.map(item => `
+        <div class="breakdown-item">
+          <div class="item-info">
+            <span class="item-icon">${item.icon}</span>
+            <span class="item-label">${item.label}</span>
+          </div>
+          <div class="item-amount">
+            <span class="item-percentage">${item.percentage}%</span>
+            <span class="item-value">$${item.amount.toLocaleString()}</span>
+          </div>
+        </div>
+      `).join('');
+      
+      breakdownList.innerHTML = listHTML;
+    }
+    
+    // Download budget
+    downloadBtn?.addEventListener('click', () => {
+      if (window.showToast) {
+        window.showToast('Descargando presupuesto...', 'success');
+      }
+      
+      // Generate summary text
+      const summary = `
+PRESUPUESTO DE VIAJE - ${budget.days} DÍAS
+
+Total estimado: $${Math.round(budget.days * (budget.accommodation + budget.meals + activityCosts[budget.activities] + budget.transport))} USD
+
+Desglose diario:
+- Alojamiento: $${budget.accommodation}
+- Comidas: $${budget.meals}
+- Actividades: $${activityCosts[budget.activities]}
+- Transporte: $${budget.transport}
+
+Total por día: $${budget.accommodation + budget.meals + activityCosts[budget.activities] + budget.transport}
+
+Generado en instantetrips.com
+      `.trim();
+      
+      // Create download
+      const blob = new Blob([summary], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'presupuesto-viaje.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      setTimeout(() => {
+        if (window.showToast) {
+          window.showToast('✅ Presupuesto descargado', 'success');
+        }
+      }, 500);
+    });
+    
+    // Initial calculation
+    calculate();
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBudgetCalculator);
+  } else {
+    initBudgetCalculator();
+  }
+  
+  document.addEventListener('astro:page-load', initBudgetCalculator);
+</script>
+
+<style>
+  .budget-calculator {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--border, #E2E8F0);
+    margin: 40px 0;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .budget-calculator {
+      background: #1e293b;
+      border-color: #334155;
+    }
+  }
+  
+  .calculator-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--border, #E2E8F0);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .calculator-header {
+      border-bottom-color: #334155;
+    }
+  }
+  
+  .calculator-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--title, #2D3748);
+    margin: 0 0 10px 0;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .calculator-header h3 {
+      color: #f1f5f9;
+    }
+  }
+  
+  .calculator-subtitle {
+    color: var(--text-secondary, #718096);
+    font-size: 0.95rem;
+    margin: 0;
+  }
+  
+  .calculator-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+  }
+  
+  @media (max-width: 1024px) {
+    .calculator-body {
+      grid-template-columns: 1fr;
+      gap: 30px;
+    }
+  }
+  
+  /* Inputs */
+  .calculator-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+  }
+  
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .input-group label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--title, #2D3748);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .input-group label {
+      color: #f1f5f9;
+    }
+  }
+  
+  .input-group label i {
+    margin-right: 8px;
+    color: #F4B942;
+  }
+  
+  .input-value {
+    font-weight: 700;
+    color: #F4B942;
+  }
+  
+  /* Slider */
+  .slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 5px;
+    background: #E2E8F0;
+    outline: none;
+    -webkit-appearance: none;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .slider {
+      background: #334155;
+    }
+  }
+  
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #F4B942, #d97706);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(244, 185, 66, 0.4);
+  }
+  
+  .slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #F4B942, #d97706);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 8px rgba(244, 185, 66, 0.4);
+  }
+  
+  .slider-marks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-secondary, #718096);
+    margin-top: 5px;
+  }
+  
+  /* Option Buttons */
+  .option-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  
+  .option-btn {
+    padding: 10px;
+    border: 2px solid var(--border, #E2E8F0);
+    background: var(--bg, white);
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text, #2D3748);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .option-btn {
+      background: #0f172a;
+      border-color: #334155;
+      color: #f1f5f9;
+    }
+  }
+  
+  .option-btn:hover {
+    border-color: #F4B942;
+    transform: translateY(-1px);
+  }
+  
+  .option-btn.active {
+    background: linear-gradient(135deg, #F4B942, #d97706);
+    border-color: #F4B942;
+    color: white;
+    box-shadow: 0 4px 12px rgba(244, 185, 66, 0.3);
+  }
+  
+  /* Results */
+  .calculator-results {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+  }
+  
+  .total-card {
+    background: linear-gradient(135deg, #F4B942, #d97706);
+    color: white;
+    border-radius: 16px;
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(244, 185, 66, 0.3);
+  }
+  
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+  }
+  
+  .result-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    opacity: 0.9;
+  }
+  
+  .result-range {
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+  
+  .result-amount {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+  }
+  
+  .amount-separator {
+    font-size: 1.5rem;
+    opacity: 0.7;
+  }
+  
+  .result-currency {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-bottom: 10px;
+  }
+  
+  .result-perday {
+    font-size: 1rem;
+    font-weight: 600;
+    opacity: 0.9;
+  }
+  
+  /* Breakdown */
+  .breakdown-section h4 {
+    font-size: 1rem;
+    margin: 0 0 15px 0;
+    color: var(--title, #2D3748);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .breakdown-section h4 {
+      color: #f1f5f9;
+    }
+  }
+  
+  .chart-bars {
+    display: flex;
+    gap: 2px;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 15px;
+  }
+  
+  .chart-bar {
+    height: 100%;
+  }
+  
+  .bar-fill {
+    height: 100%;
+    width: 100%;
+    transition: all 0.3s ease;
+  }
+  
+  .breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .breakdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: var(--bg-secondary, #F8F9FA);
+    border-radius: 10px;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .breakdown-item {
+      background: #0f172a;
+    }
+  }
+  
+  .item-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .item-icon {
+    font-size: 1.2rem;
+  }
+  
+  .item-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text, #2D3748);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .item-label {
+      color: #f1f5f9;
+    }
+  }
+  
+  .item-amount {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .item-percentage {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #718096);
+  }
+  
+  .item-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--title, #2D3748);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .item-value {
+      color: #f1f5f9;
+    }
+  }
+  
+  /* CTA */
+  .calculator-cta {
+    text-align: center;
+    padding: 20px;
+    background: var(--bg-secondary, #F8F9FA);
+    border-radius: 12px;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .calculator-cta {
+      background: #0f172a;
+    }
+  }
+  
+  .download-btn {
+    width: 100%;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #10B981, #059669);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  }
+  
+  .download-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+  }
+  
+  .download-btn:active {
+    transform: translateY(0);
+  }
+  
+  .cta-note {
+    margin: 10px 0 0 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary, #718096);
+  }
+  
+  /* Mobile */
+  @media (max-width: 768px) {
+    .budget-calculator {
+      padding: 20px;
+    }
+    
+    .calculator-header h3 {
+      font-size: 1.3rem;
+    }
+    
+    .result-amount {
+      font-size: 2rem;
+    }
+    
+    .option-buttons {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    
+    .option-btn {
+      padding: 8px;
+      font-size: 0.8rem;
+    }
+  }
+</style>

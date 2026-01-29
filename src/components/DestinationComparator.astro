@@ -1,0 +1,730 @@
+---
+/**
+ * DestinationComparator.astro
+ * Side-by-side destination comparison tool
+ */
+---
+
+<div class="comparator-fab" id="comparator-fab">
+  <button class="fab-button" id="fab-toggle">
+    <i class="fas fa-balance-scale"></i>
+    <span class="fab-badge" id="compare-count">0</span>
+  </button>
+</div>
+
+<div class="comparator-modal" id="comparator-modal">
+  <div class="comparator-container">
+    <div class="comparator-header">
+      <h3>
+        <i class="fas fa-balance-scale"></i>
+        Comparar Destinos
+      </h3>
+      <button class="close-btn" id="close-comparator">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="comparator-body" id="comparator-body">
+      <div class="comparator-empty" id="empty-state">
+        <i class="fas fa-map-marked-alt empty-icon"></i>
+        <p>Selecciona hasta 3 destinos para comparar</p>
+        <p class="empty-hint">Haz clic en el ícono <i class="fas fa-plus-circle"></i> de cualquier destino para agregarlo</p>
+      </div>
+      
+      <div class="comparison-table" id="comparison-table" style="display: none;">
+        <div class="comparison-grid" id="comparison-grid"></div>
+        
+        <div class="comparison-actions">
+          <button class="btn-secondary" id="clear-comparison">
+            <i class="fas fa-trash-alt"></i> Limpiar todo
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function initComparator() {
+    const fab = document.getElementById('comparator-fab');
+    const fabToggle = document.getElementById('fab-toggle');
+    const modal = document.getElementById('comparator-modal');
+    const closeBtn = document.getElementById('close-comparator');
+    const compareCount = document.getElementById('compare-count');
+    const emptyState = document.getElementById('empty-state');
+    const comparisonTable = document.getElementById('comparison-table');
+    const comparisonGrid = document.getElementById('comparison-grid');
+    const clearBtn = document.getElementById('clear-comparison');
+    
+    let selectedDestinations = JSON.parse(localStorage.getItem('compareDestinations') || '[]');
+    const MAX_COMPARE = 3;
+    
+    // Update FAB badge
+    function updateBadge() {
+      compareCount.textContent = selectedDestinations.length;
+      fab.style.display = selectedDestinations.length > 0 ? 'block' : 'none';
+    }
+    
+    // Toggle comparison
+    function toggleDestination(destData) {
+      const index = selectedDestinations.findIndex(d => d.id === destData.id);
+      
+      if (index > -1) {
+        selectedDestinations.splice(index, 1);
+        if (window.showToast) {
+          window.showToast(`${destData.name} removido de la comparación`, 'info');
+        }
+      } else {
+        if (selectedDestinations.length >= MAX_COMPARE) {
+          if (window.showToast) {
+            window.showToast(`Máximo ${MAX_COMPARE} destinos para comparar`, 'warning');
+          }
+          return;
+        }
+        selectedDestinations.push(destData);
+        if (window.showToast) {
+          window.showToast(`${destData.name} agregado a la comparación`, 'success');
+        }
+      }
+      
+      localStorage.setItem('compareDestinations', JSON.stringify(selectedDestinations));
+      updateBadge();
+      updateCompareButtons();
+      
+      if (modal.classList.contains('modal-open')) {
+        renderComparison();
+      }
+    }
+    
+    // Render comparison table
+    function renderComparison() {
+      if (selectedDestinations.length === 0) {
+        emptyState.style.display = 'block';
+        comparisonTable.style.display = 'none';
+        return;
+      }
+      
+      emptyState.style.display = 'none';
+      comparisonTable.style.display = 'block';
+      
+      const metrics = [
+        { key: 'budget', label: 'Presupuesto diario', icon: '💵' },
+        { key: 'days', label: 'Días recomendados', icon: '⏰' },
+        { key: 'bestTime', label: 'Mejor época', icon: '📅' },
+        { key: 'type', label: 'Tipo de viaje', icon: '🎯' },
+        { key: 'activities', label: 'Actividades', icon: '🎨' },
+        { key: 'weather', label: 'Clima', icon: '☀️' }
+      ];
+      
+      let gridHTML = `
+        <div class="compare-row header-row">
+          <div class="compare-cell metric-label"></div>
+          ${selectedDestinations.map(dest => `
+            <div class="compare-cell dest-header">
+              <div class="dest-image" style="background-image: url('${dest.image}')"></div>
+              <h4>${dest.name}</h4>
+              <button class="remove-dest-btn" data-dest-id="${dest.id}">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      
+      metrics.forEach(metric => {
+        gridHTML += `
+          <div class="compare-row">
+            <div class="compare-cell metric-label">
+              <span class="metric-icon">${metric.icon}</span>
+              <span>${metric.label}</span>
+            </div>
+            ${selectedDestinations.map(dest => `
+              <div class="compare-cell">
+                ${dest[metric.key] || 'N/A'}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      });
+      
+      gridHTML += `
+        <div class="compare-row action-row">
+          <div class="compare-cell metric-label"></div>
+          ${selectedDestinations.map(dest => `
+            <div class="compare-cell">
+              <a href="${dest.url}" class="view-dest-btn">
+                Ver destino <i class="fas fa-arrow-right"></i>
+              </a>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      
+      comparisonGrid.innerHTML = gridHTML;
+      
+      // Remove destination buttons
+      comparisonGrid.querySelectorAll('.remove-dest-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          const destId = this.getAttribute('data-dest-id');
+          const dest = selectedDestinations.find(d => d.id === destId);
+          if (dest) {
+            toggleDestination(dest);
+          }
+        });
+      });
+    }
+    
+    // Update compare buttons on page
+    function updateCompareButtons() {
+      document.querySelectorAll('[data-compare-destination]').forEach(btn => {
+        const destId = btn.getAttribute('data-compare-id');
+        const isSelected = selectedDestinations.some(d => d.id === destId);
+        
+        if (isSelected) {
+          btn.classList.add('compare-active');
+          btn.innerHTML = '<i class="fas fa-check-circle"></i>';
+        } else {
+          btn.classList.remove('compare-active');
+          btn.innerHTML = '<i class="fas fa-plus-circle"></i>';
+        }
+      });
+    }
+    
+    // Add compare buttons to destination cards
+    function addCompareButtons() {
+      const destinationCards = document.querySelectorAll('[data-destination-card]');
+      
+      destinationCards.forEach(card => {
+        if (card.querySelector('.compare-btn')) return; // Already has button
+        
+        const destId = card.getAttribute('data-destination-id');
+        const destName = card.getAttribute('data-destination-name');
+        const destImage = card.getAttribute('data-destination-image');
+        const destUrl = card.getAttribute('data-destination-url') || card.getAttribute('href');
+        
+        const compareBtn = document.createElement('button');
+        compareBtn.className = 'compare-btn';
+        compareBtn.setAttribute('data-compare-destination', '');
+        compareBtn.setAttribute('data-compare-id', destId);
+        compareBtn.innerHTML = '<i class="fas fa-plus-circle"></i>';
+        compareBtn.title = 'Comparar destino';
+        
+        compareBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          toggleDestination({
+            id: destId,
+            name: destName,
+            image: destImage,
+            url: destUrl,
+            budget: card.getAttribute('data-budget') || '$50-100',
+            days: card.getAttribute('data-days') || '3-5 días',
+            bestTime: card.getAttribute('data-best-time') || 'Oct-Mar',
+            type: card.getAttribute('data-type') || 'Ciudad',
+            activities: card.getAttribute('data-activities') || 'Variadas',
+            weather: card.getAttribute('data-weather') || 'Templado'
+          });
+        });
+        
+        card.style.position = 'relative';
+        card.appendChild(compareBtn);
+      });
+      
+      updateCompareButtons();
+    }
+    
+    // Open/close modal
+    fabToggle?.addEventListener('click', () => {
+      modal.classList.add('modal-open');
+      document.body.style.overflow = 'hidden';
+      renderComparison();
+    });
+    
+    closeBtn?.addEventListener('click', () => {
+      modal.classList.remove('modal-open');
+      document.body.style.overflow = '';
+    });
+    
+    modal?.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.remove('modal-open');
+        document.body.style.overflow = '';
+      }
+    });
+    
+    clearBtn?.addEventListener('click', () => {
+      selectedDestinations = [];
+      localStorage.setItem('compareDestinations', '[]');
+      updateBadge();
+      updateCompareButtons();
+      renderComparison();
+      
+      if (window.showToast) {
+        window.showToast('Comparación limpiada', 'info');
+      }
+    });
+    
+    // Initialize
+    addCompareButtons();
+    updateBadge();
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initComparator);
+  } else {
+    initComparator();
+  }
+  
+  document.addEventListener('astro:page-load', initComparator);
+</script>
+
+<style is:global>
+  /* FAB Button */
+  .comparator-fab {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 9998;
+    display: none;
+  }
+  
+  .fab-button {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #F4B942, #d97706);
+    border: none;
+    color: white;
+    font-size: 1.3rem;
+    cursor: pointer;
+    box-shadow: 0 8px 30px rgba(244, 185, 66, 0.4);
+    transition: all 0.3s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .fab-button:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 12px 40px rgba(244, 185, 66, 0.5);
+  }
+  
+  .fab-button:active {
+    transform: translateY(-1px) scale(1);
+  }
+  
+  .fab-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #EF4444;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+  }
+  
+  /* Compare Button on Cards */
+  .compare-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid transparent;
+    color: #718096;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  
+  .compare-btn:hover {
+    background: white;
+    border-color: #F4B942;
+    color: #F4B942;
+    transform: scale(1.1);
+  }
+  
+  .compare-btn.compare-active {
+    background: #10B981;
+    color: white;
+    border-color: #10B981;
+  }
+  
+  /* Modal */
+  .comparator-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  
+  .comparator-modal.modal-open {
+    opacity: 1;
+    pointer-events: all;
+  }
+  
+  .comparator-container {
+    background: white;
+    border-radius: 20px;
+    max-width: 1200px;
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 80px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .modal-open .comparator-container {
+    transform: scale(1);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .comparator-container {
+      background: #1e293b;
+    }
+  }
+  
+  .comparator-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 25px 30px;
+    border-bottom: 1px solid var(--border, #E2E8F0);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .comparator-header {
+      border-bottom-color: #334155;
+    }
+  }
+  
+  .comparator-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--title, #2D3748);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .comparator-header h3 {
+      color: #f1f5f9;
+    }
+  }
+  
+  .comparator-header h3 i {
+    color: #F4B942;
+  }
+  
+  .close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary, #718096);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .close-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #EF4444;
+  }
+  
+  .comparator-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 30px;
+  }
+  
+  /* Empty State */
+  .comparator-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary, #718096);
+  }
+  
+  .empty-icon {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    opacity: 0.3;
+  }
+  
+  .comparator-empty p {
+    margin: 10px 0;
+    font-size: 1rem;
+  }
+  
+  .empty-hint {
+    font-size: 0.9rem;
+    opacity: 0.7;
+  }
+  
+  .empty-hint i {
+    color: #F4B942;
+  }
+  
+  /* Comparison Table */
+  .comparison-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--border, #E2E8F0);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .comparison-grid {
+      border-color: #334155;
+    }
+  }
+  
+  .compare-row {
+    display: grid;
+    grid-template-columns: 200px repeat(auto-fit, minmax(200px, 1fr));
+    border-bottom: 1px solid var(--border, #E2E8F0);
+  }
+  
+  .compare-row:last-child {
+    border-bottom: none;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .compare-row {
+      border-bottom-color: #334155;
+    }
+  }
+  
+  .compare-cell {
+    padding: 20px;
+    border-right: 1px solid var(--border, #E2E8F0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--text, #2D3748);
+  }
+  
+  .compare-cell:last-child {
+    border-right: none;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .compare-cell {
+      border-right-color: #334155;
+      color: #f1f5f9;
+    }
+  }
+  
+  .header-row {
+    background: var(--bg-secondary, #F8F9FA);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .header-row {
+      background: #0f172a;
+    }
+  }
+  
+  .metric-label {
+    background: var(--bg-secondary, #F8F9FA);
+    font-weight: 700;
+    justify-content: flex-start;
+    gap: 10px;
+    color: var(--title, #2D3748);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .metric-label {
+      background: #0f172a;
+      color: #f1f5f9;
+    }
+  }
+  
+  .metric-icon {
+    font-size: 1.2rem;
+  }
+  
+  .dest-header {
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    padding-top: 15px;
+  }
+  
+  .dest-image {
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    background-size: cover;
+    background-position: center;
+  }
+  
+  .dest-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--title, #2D3748);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .dest-header h4 {
+      color: #f1f5f9;
+    }
+  }
+  
+  .remove-dest-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.1);
+    border: none;
+    color: #EF4444;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .remove-dest-btn:hover {
+    background: #EF4444;
+    color: white;
+  }
+  
+  .view-dest-btn {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #F4B942, #d97706);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.2s ease;
+  }
+  
+  .view-dest-btn:hover {
+    transform: translateY(-2px);
+  }
+  
+  .comparison-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+  }
+  
+  .btn-secondary {
+    padding: 12px 24px;
+    background: transparent;
+    border: 2px solid var(--border, #E2E8F0);
+    border-radius: 10px;
+    color: var(--text, #2D3748);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-secondary:hover {
+    background: #FEE2E2;
+    border-color: #EF4444;
+    color: #EF4444;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .btn-secondary {
+      border-color: #334155;
+      color: #f1f5f9;
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
+  }
+  
+  /* Mobile */
+  @media (max-width: 1024px) {
+    .compare-row {
+      grid-template-columns: 150px repeat(auto-fit, minmax(150px, 1fr));
+    }
+    
+    .compare-cell {
+      padding: 15px 10px;
+      font-size: 0.85rem;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .comparator-fab {
+      bottom: 20px;
+      right: 20px;
+    }
+    
+    .fab-button {
+      width: 56px;
+      height: 56px;
+      font-size: 1.2rem;
+    }
+    
+    .comparator-body {
+      padding: 20px;
+    }
+    
+    .compare-row {
+      grid-template-columns: 120px repeat(auto-fit, minmax(120px, 1fr));
+    }
+    
+    .compare-cell {
+      padding: 12px 8px;
+      font-size: 0.8rem;
+    }
+    
+    .dest-image {
+      width: 60px;
+      height: 60px;
+    }
+    
+    .dest-header h4 {
+      font-size: 0.95rem;
+    }
+  }
+</style>

@@ -1,4 +1,9 @@
 ---
+import ReadingProgress from '../components/ReadingProgress.astro';
+import ToastNotification from '../components/ToastNotification.astro';
+import SearchBar from '../components/SearchBar.astro';
+import DestinationComparator from '../components/DestinationComparator.astro';
+
 interface Props {
     title: string;
     description?: string;
@@ -50,6 +55,12 @@ const canonicalURL = new URL(Astro.url.pathname, 'https://www.instantetrips.com'
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     </head>
     <body>
+        <!-- UX Enhancement Components -->
+        <ReadingProgress />
+        <ToastNotification />
+        <SearchBar />
+        <DestinationComparator />
+        
         <slot />
 
         <footer class="minimal-footer">

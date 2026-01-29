@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar.astro';
 import Hero from '../components/Hero.astro';
 import Card from '../components/Card.astro';
 import TipCard from '../components/TipCard.astro';
+import BudgetCalculator from '../components/BudgetCalculator.astro';
 import { getCollection } from 'astro:content';
 
 // Cargar destinos dinámicamente desde la colección de contenido
@@ -88,18 +89,35 @@ const feriados = [
             </div>
         </section>
 
+
         <section id="destinos" class="mb-section scroll-offset">
             <div class="section-header">
                 <h2>Destinos recomendados</h2>
             </div>
             <div class="grid">
                 {destinos.map((d) => (
-                    <a href={`/argentina/destinos/${d.id}`} class="card-link">
+                    <a href={`/argentina/destinos/${d.id}`} 
+                       class="card-link"
+                       data-destination-card
+                       data-destination-id={d.id}
+                       data-destination-name={d.title}
+                       data-destination-image={d.img}
+                       data-destination-url={`/argentina/destinos/${d.id}`}
+                       data-budget="$50-100"
+                       data-days="3-5 días"
+                       data-best-time="Oct-Mar"
+                       data-type="Ciudad"
+                       data-activities="Variadas"
+                       data-weather="Templado"
+                       data-search-destination={d.title}
+                       data-search-desc={d.activity}>
                         <Card title={d.title} tag={d.tag} activity={d.activity} img={d.img} />
                     </a>
                 ))}
             </div>
         </section>
+
+
 
 
         <section id="planifica" class="mb-section scroll-offset">
@@ -123,12 +141,24 @@ const feriados = [
             </a>
 
             <div class="tips-grid">
-                <TipCard icon="💵" title="Moneda" text="Usa el 'Dólar Blue' para obtener el mejor cambio en efectivo." />
-                <TipCard icon="🛂" title="Visas" text="Turismo libre por 90 días para la mayoría de países." />
-                <TipCard icon="✈️" title="Transporte" text="Vuelos internos para distancias largas y tarjeta SUBE para ciudad." />
-                <TipCard icon="☀️" title="Clima" text="Primavera (Sep-Nov) y Otoño son las mejores épocas." />
+                <div data-search-tip="Moneda - Dólar Blue" data-search-desc="Usa el Dólar Blue para obtener el mejor cambio en efectivo">
+                    <TipCard icon="💵" title="Moneda" text="Usa el 'Dólar Blue' para obtener el mejor cambio en efectivo." />
+                </div>
+                <div data-search-tip="Visas - Turismo" data-search-desc="Turismo libre por 90 días para la mayoría de países">
+                    <TipCard icon="🛂" title="Visas" text="Turismo libre por 90 días para la mayoría de países." />
+                </div>
+                <div data-search-tip="Transporte - Vuelos y SUBE" data-search-desc="Vuelos internos para distancias largas y tarjeta SUBE para ciudad">
+                    <TipCard icon="✈️" title="Transporte" text="Vuelos internos para distancias largas y tarjeta SUBE para ciudad." />
+                </div>
+                <div data-search-tip="Clima - Mejor época" data-search-desc="Primavera y Otoño son las mejores épocas">
+                    <TipCard icon="☀️" title="Clima" text="Primavera (Sep-Nov) y Otoño son las mejores épocas." />
+                </div>
             </div>
         </section>
+
+        <!-- Calculadora de Presupuesto -->
+        <BudgetCalculator destinationName="Argentina" />
+
 
         <section id="eventos" class="mb-section scroll-offset">
             <div class="section-header">
@@ -162,32 +192,32 @@ const feriados = [
                 <h2>Preguntas Frecuentes</h2>
             </div>
             <div class="faq-container">
-                <details class="faq-item" name="faq-group">
+                <details class="faq-item" name="faq-group" data-search-faq="¿Es seguro viajar a Argentina?">
                     <summary>¿Es seguro viajar a Argentina?</summary>
                     <p>Sí, es muy acogedor. Solo tené "cuidado de ciudad grande" en Buenos Aires y evita zonas turísticas de noche sin compañía.</p>
                 </details>
 
-                <details class="faq-item" name="faq-group">
+                <details class="faq-item" name="faq-group" data-search-faq="¿Qué moneda debo llevar?">
                     <summary>¿Qué moneda debo llevar?</summary>
                     <p>El efectivo es rey. Traé Dólares o Euros nuevos (sin marcas) para cambiar al valor "Blue". Las tarjetas extranjeras ahora tienen buen cambio, pero el efectivo sigue siendo útil.</p>
                 </details>
 
-                <details class="faq-item" name="faq-group">
+                <details class="faq-item" name="faq-group" data-search-faq="¿A qué hora se cena?">
                     <summary>¿A qué hora se cena?</summary>
                     <p>¡Tarde! Los restaurantes se llenan a las 21:30 o 22:00 hs. Ir a las 19:00 es merendar para nosotros.</p>
                 </details>
 
-                <details class="faq-item" name="faq-group">
+                <details class="faq-item" name="faq-group" data-search-faq="¿Se deja propina?">
                     <summary>¿Se deja propina?</summary>
                     <p>No es obligatoria por ley, pero se acostumbra dejar el 10% si el servicio fue bueno.</p>
                 </details>
 
-                <details class="faq-item" name="faq-group">
+                <details class="faq-item" name="faq-group" data-search-faq="¿Necesito adaptador?">
                     <summary>¿Necesito adaptador?</summary>
                     <p>Sí, usamos el Tipo I (patas oblicuas, como en Australia). El voltaje es 220V.</p>
                 </details>
                 
-                <details class="faq-item" name="faq-group">
+                <details class="faq-item" name="faq-group" data-search-faq="¿Cómo tengo internet?">
                     <summary>¿Cómo tengo internet?</summary>
                     <p>Lo más práctico hoy es comprar una eSIM internacional o un chip prepago de Claro/Personal/Movistar al llegar (necesitas pasaporte).</p>
                 </details>

@@ -1,0 +1,82 @@
+---
+/**
+ * ReadingProgress.astro
+ * Reading progress bar that shows scroll completion
+ */
+---
+
+<div class="reading-progress-container">
+  <div class="reading-progress-bar" id="reading-progress"></div>
+</div>
+
+<script>
+  function initReadingProgress() {
+    const progressBar = document.getElementById('reading-progress');
+    if (!progressBar) return;
+    
+    let ticking = false;
+    
+    function updateProgress() {
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      
+      const scrollableHeight = documentHeight - windowHeight;
+      const scrolled = (scrollTop / scrollableHeight) * 100;
+      
+      progressBar.style.width = Math.min(scrolled, 100) + '%';
+      ticking = false;
+    }
+    
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateProgress);
+        ticking = true;
+      }
+    });
+    
+    // Initial update
+    updateProgress();
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initReadingProgress);
+  } else {
+    initReadingProgress();
+  }
+  
+  document.addEventListener('astro:page-load', initReadingProgress);
+</script>
+
+<style>
+  .reading-progress-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: rgba(0, 0, 0, 0.05);
+    z-index: 10000;
+    pointer-events: none;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .reading-progress-container {
+      background: rgba(255, 255, 255, 0.05);
+    }
+  }
+  
+  .reading-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #F4B942 0%, #75AADB 50%, #10B981 100%);
+    transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 8px rgba(244, 185, 66, 0.4);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .reading-progress-bar {
+      box-shadow: 0 0 10px rgba(244, 185, 66, 0.6);
+    }
+  }
+</style>

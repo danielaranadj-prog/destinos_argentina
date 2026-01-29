@@ -42,6 +42,11 @@
         </div>
       </div>
 
+      <!-- Search Button -->
+      <button id="search-btn" class="search-btn" aria-label="Buscar" title="Buscar destinos, tips y más">
+        <i class="fas fa-search"></i>
+      </button>
+
       <button id="menu-toggle" class="menu-btn" aria-label="Abrir menú">
         <i class="fas fa-bars"></i>
       </button>
@@ -86,6 +91,8 @@
   const destBtn = document.getElementById('dest-toggle');
   const destPopup = document.getElementById('dest-popup');
 
+  const searchBtn = document.getElementById('search-btn');
+
   const toggleMenu = () => {
     mobileMenu?.classList.toggle('active');
     destPopup?.classList.remove('active');
@@ -104,6 +111,19 @@
     if (mobileMenu?.classList.contains('active')) toggleMenu();
   };
 
+  // Open search modal
+  const openSearch = () => {
+    const searchOverlay = document.getElementById('search-overlay');
+    if (searchOverlay) {
+      searchOverlay.classList.add('search-open');
+      document.body.style.overflow = 'hidden';
+      setTimeout(() => {
+        const searchInput = document.getElementById('search-input') as HTMLInputElement;
+        searchInput?.focus();
+      }, 100);
+    }
+  };
+
   menuBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     toggleMenu();
@@ -112,6 +132,11 @@
   destBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     toggleDest();
+  });
+
+  searchBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openSearch();
   });
 
   document.addEventListener('click', (e) => {
@@ -230,6 +255,29 @@
   .icon-btn:hover, .menu-btn:hover {
     color: var(--gold, #D4AF37);
     transform: scale(1.1);
+  }
+
+  /* Search Button */
+  .search-btn {
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    color: var(--title);
+    padding: 5px;
+    transition: transform 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .search-btn:hover {
+    color: var(--gold, #D4AF37);
+    transform: scale(1.1);
+  }
+
+  .search-btn i {
+    color: inherit;
   }
 
   /* --- POPUP DESTINOS --- */

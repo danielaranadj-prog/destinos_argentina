@@ -1,0 +1,489 @@
+---
+/**
+ * StickyInfoPanel.astro
+ * Sticky sidebar with key destination information
+ * Shows weather, prices, best time to visit, and CTA
+ */
+
+interface Props {
+  destinationName: string;
+  destinationSlug: string;
+  flightPriceFrom?: number;
+  bestMonths?: string;
+  leadMagnetUrl?: string;
+}
+
+const { 
+  destinationName, 
+  destinationSlug,
+  flightPriceFrom = 450,
+  bestMonths = "Oct - Mar",
+  leadMagnetUrl = "#lead-magnet"
+} = Astro.props;
+---
+
+<aside class="sticky-info-panel" id="sticky-panel">
+  <!-- Weather Widget -->
+  <div class="panel-section weather-section">
+    <h4><i class="fas fa-cloud-sun"></i> Clima Actual</h4>
+    <div class="weather-widget" id="weather-widget">
+      <div class="weather-loading">
+        <i class="fas fa-spinner fa-spin"></i>
+        Cargando clima...
+      </div>
+      <div class="weather-content" style="display: none;">
+        <div class="weather-temp">
+          <span class="temp-value" id="temp-value">--</span>°C
+        </div>
+        <div class="weather-desc" id="weather-desc">--</div>
+        <div class="weather-emoji" id="weather-emoji">☀️</div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Flight Prices -->
+  <div class="panel-section price-section">
+    <h4><i class="fas fa-plane-departure"></i> Vuelos</h4>
+    <div class="price-info">
+      <div class="price-label">Desde</div>
+      <div class="price-value">${flightPriceFrom}<span class="price-currency">USD</span></div>
+      <a href="#flight-search" class="panel-link">
+        Ver vuelos <i class="fas fa-arrow-right"></i>
+      </a>
+    </div>
+  </div>
+  
+  <!-- Best Time to Visit -->
+  <div class="panel-section best-time-section">
+    <h4><i class="fas fa-calendar-check"></i> Mejor Época</h4>
+    <div class="best-time-info">
+      <div class="months">{bestMonths}</div>
+      <div class="reason">Clima ideal y menos turistas</div>
+    </div>
+  </div>
+  
+  <!-- Download Guide CTA -->
+  <div class="panel-section cta-section">
+    <div class="cta-content">
+      <div class="cta-icon">📥</div>
+      <h4>Guía Completa de {destinationName}</h4>
+      <p>Descarga tu itinerario detallado GRATIS</p>
+      <a href={leadMagnetUrl} class="cta-button">
+        Descargar Ahora
+      </a>
+    </div>
+  </div>
+  
+  <!-- Quick Stats -->
+  <div class="panel-section stats-section">
+    <h4><i class="fas fa-info-circle"></i> Info Rápida</h4>
+    <div class="quick-stats">
+      <div class="stat-item">
+        <span class="stat-icon">💵</span>
+        <span class="stat-label">Presupuesto diario</span>
+        <span class="stat-value" id="daily-budget">$50-100</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-icon">⏰</span>
+        <span class="stat-label">Días recomendados</span>
+        <span class="stat-value" id="recommended-days">3-5 días</span>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<script define:vars={{ destinationName }}>
+  async function initStickyPanel() {
+    const panel = document.getElementById('sticky-panel');
+    const weatherWidget = document.getElementById('weather-widget');
+    const weatherLoading = weatherWidget.querySelector('.weather-loading');
+    const weatherContent = weatherWidget.querySelector('.weather-content');
+    const tempValue = document.getElementById('temp-value');
+    const weatherDesc = document.getElementById('weather-desc');
+    const weatherEmoji = document.getElementById('weather-emoji');
+    
+    if (!panel) return;
+    
+    // Sticky behavior on scroll
+    let ticking = false;
+    let lastScroll = 0;
+    
+    function updateSticky() {
+      const scrollY = window.scrollY;
+      const heroHeight = 400; // Approximate hero height
+      
+      if (scrollY > heroHeight) {
+        panel.classList.add('is-sticky');
+      } else {
+        panel.classList.remove('is-sticky');
+      }
+      
+      lastScroll = scrollY;
+      ticking = false;
+    }
+    
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateSticky);
+        ticking = true;
+      }
+    });
+    
+    // Fetch weather data
+    async function fetchWeather() {
+      try {
+        // Using OpenWeatherMap API (you'll need to replace with your API key)
+        // Or use wttr.in for free weather data
+        const cityName = destinationName.replace(' ', '+');
+        const response = await fetch(`https://wttr.in/${cityName}?format=j1`);
+        const data = await response.json();
+        
+        if (data && data.current_condition && data.current_condition[0]) {
+          const current = data.current_condition[0];
+          const temp = current.temp_C;
+          const desc = current.weatherDesc[0].value;
+          
+          tempValue.textContent = temp;
+          weatherDesc.textContent = desc;
+          
+          // Set emoji based on weather
+          const weatherCode = current.weatherCode;
+          let emoji = '☀️';
+          if (weatherCode >= 200 && weatherCode < 300) emoji = '⛈️'; // Thunderstorm
+          else if (weatherCode >= 300 && weatherCode < 500) emoji = '🌧️'; // Drizzle
+          else if (weatherCode >= 500 && weatherCode < 600) emoji = '🌧️'; // Rain
+          else if (weatherCode >= 600 && weatherCode < 700) emoji = '❄️'; // Snow
+          else if (weatherCode >= 700 && weatherCode < 800) emoji = '🌫️'; // Atmosphere
+          else if (weatherCode === 800) emoji = '☀️'; // Clear
+          else if (weatherCode > 800) emoji = '☁️'; // Clouds
+          
+          weatherEmoji.textContent = emoji;
+          
+          // Show weather content
+          weatherLoading.style.display = 'none';
+          weatherContent.style.display = 'block';
+        } else {
+          throw new Error('No weather data');
+        }
+      } catch (error) {
+        console.log('Weather fetch failed:', error);
+        // Fallback to placeholder
+        weatherLoading.innerHTML = '<div style="font-size: 0.85rem; color: #718096;">Clima no disponible</div>';
+      }
+    }
+    
+    // Fetch weather
+    await fetchWeather();
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initStickyPanel);
+  } else {
+    initStickyPanel();
+  }
+  
+  document.addEventListener('astro:page-load', initStickyPanel);
+</script>
+
+<style>
+  .sticky-info-panel {
+    position: sticky;
+    top: 100px;
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-self: flex-start;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .sticky-info-panel.is-sticky {
+    top: 80px;
+  }
+  
+  .panel-section {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+    border: 1px solid #E2E8F0;
+    transition: all 0.3s ease;
+  }
+  
+  .panel-section:hover {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .panel-section {
+      background: #1e293b;
+      border-color: #334155;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+  }
+  
+  .panel-section h4 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--title, #2D3748);
+    margin: 0 0 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .panel-section h4 {
+      color: #f1f5f9;
+    }
+  }
+  
+  .panel-section h4 i {
+    color: #F4B942;
+  }
+  
+  /* Weather Widget */
+  .weather-widget {
+    text-align: center;
+  }
+  
+  .weather-loading {
+    padding: 20px;
+    color: var(--text-secondary, #718096);
+    font-size: 0.9rem;
+  }
+  
+  .weather-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .weather-temp {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--title, #2D3748);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .weather-temp {
+      color: #f1f5f9;
+    }
+  }
+  
+  .weather-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary, #718096);
+    text-transform: capitalize;
+  }
+  
+  .weather-emoji {
+    font-size: 3rem;
+    margin: 5px 0;
+  }
+  
+  /* Price Section */
+  .price-info {
+    text-align: center;
+  }
+  
+  .price-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #718096);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  
+  .price-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #10B981;
+    line-height: 1;
+  }
+  
+  .price-currency {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-secondary, #718096);
+    margin-left: 4px;
+  }
+  
+  .panel-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 8px 16px;
+    background: #F8F9FA;
+    color: var(--title, #2D3748);
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+  
+  .panel-link:hover {
+    background: #E9ECEF;
+    transform: translateX(3px);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .panel-link {
+      background: #0f172a;
+      color: #f1f5f9;
+    }
+    
+    .panel-link:hover {
+      background: #334155;
+    }
+  }
+  
+  /* Best Time Section */
+  .best-time-info {
+    text-align: center;
+  }
+  
+  .months {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--title, #2D3748);
+    margin-bottom: 6px;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .months {
+      color: #f1f5f9;
+    }
+  }
+  
+  .reason {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #718096);
+  }
+  
+  /* CTA Section */
+  .cta-section {
+    background: linear-gradient(135deg, #F4B942, #d97706);
+    border-color: #F4B942;
+  }
+  
+  .cta-content {
+    text-align: center;
+  }
+  
+  .cta-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+  }
+  
+  .cta-section h4 {
+    color: white;
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+  
+  .cta-section p {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.85rem;
+    margin: 0 0 15px 0;
+    line-height: 1.4;
+  }
+  
+  .cta-button {
+    display: inline-block;
+    width: 100%;
+    padding: 12px 20px;
+    background: white;
+    color: #d97706;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  .cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  }
+  
+  .cta-button:active {
+    transform: translateY(0);
+  }
+  
+  /* Quick Stats */
+  .quick-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .stat-item {
+    display: grid;
+    grid-template-columns: 30px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: #F8F9FA;
+    border-radius: 10px;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .stat-item {
+      background: #0f172a;
+    }
+  }
+  
+  .stat-icon {
+    font-size: 1.2rem;
+  }
+  
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #718096);
+  }
+  
+  .stat-value {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--title, #2D3748);
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    .stat-value {
+      color: #f1f5f9;
+    }
+  }
+  
+  /* Responsive */
+  @media (max-width: 1024px) {
+    .sticky-info-panel {
+      position: relative;
+      top: 0 !important;
+      max-width: 100%;
+      margin: 40px 0;
+    }
+    
+    .sticky-info-panel.is-sticky {
+      top: 0 !important;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .sticky-info-panel {
+      gap: 15px;
+    }
+    
+    .panel-section {
+      padding: 16px;
+    }
+  }
+</style>
