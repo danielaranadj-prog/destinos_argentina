@@ -83,39 +83,133 @@ const filters = [
   </main>
 </Layout>
 
-<script>
-  // LÓGICA DE FILTRADO
-  document.addEventListener('DOMContentLoaded', () => {
-    const buttons = document.querySelectorAll('.filter-btn');
-    const cards = document.querySelectorAll('.tour-card');
+
+  import { initializeApp } from "firebase/app";
+  import { getFirestore, doc, getDoc } from "firebase/firestore";
+
+  // Configuración de Firebase (Debe coincidir con fetchTours.ts)
+  const firebaseConfig = {
+    apiKey: "AIzaSyBdsu65Voj8en9u_7eL5q0YRFuCC7fUYWA",
+    authDomain: "instantetrips-editor.firebaseapp.com",
+    projectId: "instantetrips-editor",
+  };
+
+  // Inicializar Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Variable global para filtros
+  let currentFilter = 'all';
+
+  // Lógica de Renderizado
+  function renderTours(tours) {
+    const container = document.getElementById('tours-container');
+    if (!container) return;
+
+    // Generar HTML de las tarjetas
+    const html = tours.map(tour => `
+      <a 
+        href="${tour.linkAfiliado || '#'}" 
+        target="_blank" 
+        class="tour-card" 
+        data-city="${tour.ciudad}"
+        style="display: flex;" 
+      >
+        <div class="card-image" style="background-image: url('${tour.imagen}')">
+          <div class="tag-overlay">
+            <span class="duration"><i class="far fa-clock"></i> ${tour.duracion}</span>
+          </div>
+        </div>
+        <div class="card-content">
+          <span class="city-label">${tour.ciudad.replace(/-/g, ' ').toUpperCase()}</span>
+          <h3>${tour.titulo}</h3>
+          <div class="card-bottom">
+            <span class="price">${tour.precio}</span>
+            <span class="btn-arrow"><i class="fas fa-chevron-right"></i></span>
+          </div>
+        </div>
+      </a>
+    `).join('');
+
+    container.innerHTML = html;
     
-    buttons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        // 1. Manejo visual de botones (Active state)
-        buttons.forEach(b => b.classList.remove('active'));
+    // Re-aplicar filtros
+    applyFilter(currentFilter);
+    initFilters(); // Re-asignar eventos a los botones si fuera necesario, o simplemente actualizar estado
+  }
+
+  // Lógica de Filtrado
+  function applyFilter(filterValue) {
+    const cards = document.querySelectorAll('.tour-card');
+    currentFilter = filterValue;
+
+    cards.forEach(card => {
+      const cardCity = card.getAttribute('data-city');
+      const htmlCard = card;
+      
+      if (filterValue === 'all' || filterValue === cardCity) {
+        htmlCard.style.display = 'flex';
+        setTimeout(() => htmlCard.style.opacity = '1', 50);
+      } else {
+        htmlCard.style.display = 'none';
+        htmlCard.style.opacity = '0';
+      }
+    });
+
+    // Actualizar botones visualmente
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      if(btn.dataset.filter === filterValue) {
         btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  }
 
-        // 2. Obtener filtro
-        const filterValue = btn.getAttribute('data-filter');
-
-        // 3. Filtrar tarjetas con animación
-        cards.forEach(card => {
-          const cardCity = card.getAttribute('data-city');
-          const htmlCard = card as HTMLElement;
-          
-          if (filterValue === 'all' || filterValue === cardCity) {
-            htmlCard.style.display = 'flex';
-            // Pequeño timeout para permitir transición de opacidad si quisieras animar
-            setTimeout(() => htmlCard.style.opacity = '1', 50);
-          } else {
-            htmlCard.style.display = 'none';
-            htmlCard.style.opacity = '0';
-          }
-        });
+  function initFilters() {
+    const buttons = document.querySelectorAll('.filter-btn');
+    buttons.forEach(btn => {
+      // Remover listeners anteriores para evitar duplicados (simple clutch)
+      const newBtn = btn.cloneNode(true);
+      if(btn.parentNode) btn.parentNode.replaceChild(newBtn, btn);
+      
+      newBtn.addEventListener('click', () => {
+        const filterValue = newBtn.getAttribute('data-filter');
+        applyFilter(filterValue);
       });
     });
+  }
+
+  // Cargar tours actualizados
+  async function fetchLiveTours() {
+    try {
+      console.log('Fetching live tours...');
+      const docRef = doc(db, 'config', 'tours');
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const toursArgentina = data.argentina || [];
+        
+        if (toursArgentina.length > 0) {
+          console.log('Live tours loaded:', toursArgentina.length);
+          renderTours(toursArgentina);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching live tours:', error);
+    }
+  }
+
+  // Inicialización
+  document.addEventListener('DOMContentLoaded', () => {
+    // 1. Inicializar filtros con data estática (SSR)
+    initFilters();
+
+    // 2. Fetch data fresca y actualizar
+    fetchLiveTours();
   });
-</script>
+
 
 <style>
   .page-container {
