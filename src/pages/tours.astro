@@ -107,6 +107,7 @@ const filters = [
     const container = document.getElementById('tours-container');
     if (!container) return;
 
+
     // Generar HTML de las tarjetas
     const html = tours.map(tour => `
       <a 
@@ -114,7 +115,6 @@ const filters = [
         target="_blank" 
         class="tour-card" 
         data-city="${tour.ciudad}"
-        style="display: flex;" 
       >
         <div class="card-image" style="background-image: url('${tour.imagen}')">
           <div class="tag-overlay">
@@ -298,6 +298,10 @@ const filters = [
     gap: 25px;
   }
 
+  .hidden { display: none; }
+</style>
+
+<style is:global>
   .tour-card {
     background: var(--card-bg);
     border-radius: 16px;
@@ -396,6 +400,4 @@ const filters = [
     background: var(--gold);
     color: white;
   }
-
-  .hidden { display: none; }
 </style>
